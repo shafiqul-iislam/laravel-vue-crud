@@ -6,8 +6,11 @@ const postFormData = reactive({
     title: '',
     content: '',
     editMode: false,
-    editId: null
+    editId: null,
+    image: null
 });
+
+const imageInput = ref(null);
 
 // posts must be an object with `data` and `links`
 const posts = ref({
@@ -37,18 +40,33 @@ const editPost = (post) => {
 }
 
 const savePost = async () => {
-    const postContent = {
-        title: postFormData.title,
-        content: postFormData.content
-    }
 
     try {
+
+        const formData = new FormData();
+        formData.append('title', postFormData.title);
+        formData.append('content', postFormData.content);
+
+        if (postFormData.image) {
+            formData.append('image', postFormData.image);
+        }
+
         if (postFormData.editMode) {
-            await axios.put(`/api/update-post/${postFormData.editId}`, postContent);
+
+            formData.append('_method', 'PUT');
+            await axios.post(`/api/update-post/${postFormData.editId}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
             postFormData.editMode = false;
             alert('Post updated successfully');
         } else {
-            await axios.post('/api/add-post', postContent);
+            await axios.post('/api/add-post', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
             alert('Post created successfully');
         }
 
@@ -57,6 +75,8 @@ const savePost = async () => {
         // Clear form after successful submission
         postFormData.title = '';
         postFormData.content = '';
+        postFormData.image = null;
+        imageInput.value.value = null;
 
     } catch (error) {
         console.log('Error saving post', error);
@@ -71,6 +91,13 @@ const deletePost = async (id) => {
     } catch (error) {
         console.log('Error deleting post', error);
     }
+}
+
+
+const handleFileUpload = (event) => {
+
+    postFormData.image = event.target.files[0];
+
 }
 </script>
 
@@ -94,6 +121,12 @@ const deletePost = async (id) => {
                     placeholder="Enter content"></textarea>
             </div>
 
+            <div class="mb-4">
+                <input type="file"
+                    class="w-full border rounded-md p-2 focus:outline-none focus:ring focus:ring-indigo-300"
+                    @change="handleFileUpload" ref="imageInput">
+            </div>
+
             <button type="submit" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded">
                 {{ postFormData.editMode ? 'Update' : 'Create' }}
             </button>
@@ -104,6 +137,9 @@ const deletePost = async (id) => {
             <h3 class="text-lg font-semibold mb-2">{{ post.title }}</h3>
             <p class="text-gray-600">{{ post.content }}</p>
 
+            <img v-if="post.image" :src="`/storage/images/${post.image}`" :alt="post.image"
+                class="mt-3 mb-3 w-1/2 mx-auto rounded md:w-1/4 md:mx-0">
+
             <button type="button" @click="editPost(post)"
                 class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded mt-3 mr-3">Edit</button>
             <button type="button" @click="deletePost(post.id)"
@@ -112,13 +148,9 @@ const deletePost = async (id) => {
 
         <!-- Pagination -->
         <div class="flex flex-wrap justify-center" v-if="posts.links && posts.links.length">
-            <button v-for="(link, index) in posts.links" 
-                :key="index" 
-                @click="link.url && fetchPosts(link.url)"
-                v-html="link.label"
-                :disabled="!link.url"
-                class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded mt-3 mr-3 disabled:opacity-50"
-            ></button>
+            <button v-for="(link, index) in posts.links" :key="index" @click="link.url && fetchPosts(link.url)"
+                v-html="link.label" :disabled="!link.url"
+                class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded mt-3 mr-3 disabled:opacity-50"></button>
         </div>
     </div>
 </template>
